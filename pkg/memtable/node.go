@@ -1,12 +1,14 @@
 package memtable
 
+type Color uint
+
 const (
-	RED = iota
+	RED Color = iota
 	BLACK
 )
 
 type Node struct {
-	Color  int
+	Color  Color
 	Key    string
 	Value  interface{}
 	Parent *Node
@@ -14,7 +16,7 @@ type Node struct {
 	Right  *Node
 }
 
-var nilNode = &Node{Color: BLACK}
+var NilNode = &Node{Color: BLACK}
 
 func NewNode(key string, value interface{}) *Node {
 	return &Node{
@@ -22,7 +24,7 @@ func NewNode(key string, value interface{}) *Node {
 		Parent: nil,
 		Key:    key,
 		Value:  value,
-		Left:   nilNode,
-		Right:  nilNode,
+		Left:   NilNode,
+		Right:  NilNode,
 	}
 }
