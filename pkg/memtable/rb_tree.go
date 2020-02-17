@@ -1,6 +1,7 @@
 package memtable
 
 import (
+	"sync"
 	"unsafe"
 )
 
@@ -8,6 +9,8 @@ type RBTree struct {
 	Root *Node
 	Size int
 	list []Item
+
+	sync.Mutex
 }
 
 func NewRBTree() *RBTree {
@@ -23,7 +26,8 @@ type Item struct {
 }
 
 func (r *RBTree) Add(key string, value interface{}) {
-
+	r.Lock()
+	defer r.Unlock()
 	newNode := NewNode(key, value)
 	payloadSize := int(unsafe.Sizeof(newNode))
 
@@ -147,6 +151,8 @@ func (r *RBTree) rotateRight(newNode *Node) {
 
 // Search will check if key is in tree and return if so
 func (r *RBTree) Search(key string) *Node {
+	r.Lock()
+	defer r.Unlock()
 	currentNode := r.Root
 	for currentNode != NilNode && key != currentNode.Key {
 		if key < currentNode.Key {
@@ -162,6 +168,8 @@ func (r *RBTree) Search(key string) *Node {
 
 // ToList returns a inorder list of tree
 func (r *RBTree) ToList() []Item {
+	r.Lock()
+	defer r.Unlock()
 	// InOrder traversal to serialize nodes to list
 	r.inOrderTraverse(r.Root)
 	return r.list
