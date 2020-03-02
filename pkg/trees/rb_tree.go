@@ -1,28 +1,75 @@
-package memtable
+package trees
 
 import (
+	"fmt"
 	"sync"
 	"unsafe"
 )
 
+const TREE_TYPE_RB = "redblack"
+
+type Color uint
+
+const (
+	RED Color = iota
+	BLACK
+)
+
+type RedBlackNode struct {
+	Color  Color
+	Key    string
+	Value  interface{}
+	Parent *RedBlackNode
+	Left   *RedBlackNode
+	Right  *RedBlackNode
+}
+
+func (r *RedBlackNode) GetKey() string {
+	return r.Key
+}
+
+func (r *RedBlackNode) GetValue() interface{} {
+	return r.Value
+}
+
+var NilNode = &RedBlackNode{Color: BLACK}
+
+func NewNode(key string, value interface{}) *RedBlackNode {
+	return &RedBlackNode{
+		Color:  BLACK,
+		Parent: nil,
+		Key:    key,
+		Value:  value,
+		Left:   NilNode,
+		Right:  NilNode,
+	}
+}
+
 type RBTree struct {
-	Root *Node
+	Type string
+	Root *RedBlackNode
 	Size int
-	list []Item
 
 	sync.Mutex
 }
 
-func NewRBTree() *RBTree {
+func NewRBTree() Tree {
 	return &RBTree{
+		Type: TREE_TYPE_RB,
 		Root: nil,
 	}
 }
 
-type Item struct {
-	Key     string
-	Value   interface{}
-	Deleted bool
+func init() {
+	Factory.Register(TREE_TYPE_RB, NewRBTree)
+}
+
+func (r *RBTree) GetType() string {
+	return r.Type
+}
+
+func (r *RBTree) GetSize() int {
+	return r.Size
 }
 
 func (r *RBTree) Add(key string, value interface{}) {
@@ -63,7 +110,7 @@ func (r *RBTree) Add(key string, value interface{}) {
 	}
 }
 
-func (r *RBTree) fixTreeAfterAdd(newNode *Node) {
+func (r *RBTree) fixTreeAfterAdd(newNode *RedBlackNode) {
 	newNode.Color = RED
 	for newNode != r.Root && newNode.Parent.Color == RED {
 		if newNode.Parent.Parent.Left == newNode.Parent {
@@ -76,7 +123,7 @@ func (r *RBTree) fixTreeAfterAdd(newNode *Node) {
 			} else {
 				if newNode == newNode.Parent.Right {
 					newNode = newNode.Parent
-					r.RotateLeft(newNode)
+					r.rotateLeft(newNode)
 				}
 				newNode.Parent.Color = BLACK
 				newNode.Parent.Parent.Color = RED
@@ -96,13 +143,13 @@ func (r *RBTree) fixTreeAfterAdd(newNode *Node) {
 				}
 				newNode.Parent.Color = BLACK
 				newNode.Parent.Parent.Color = RED
-				r.RotateLeft(newNode.Parent.Parent)
+				r.rotateLeft(newNode.Parent.Parent)
 			}
 		}
 	}
 	r.Root.Color = BLACK
 }
-func (r *RBTree) RotateLeft(newNode *Node) {
+func (r *RBTree) rotateLeft(newNode *RedBlackNode) {
 	RightNode := newNode.Right
 
 	newNode.Right = RightNode.Left
@@ -130,7 +177,7 @@ func (r *RBTree) RotateLeft(newNode *Node) {
 	newNode.Parent = RightNode
 
 }
-func (r *RBTree) rotateRight(newNode *Node) {
+func (r *RBTree) rotateRight(newNode *RedBlackNode) {
 	LeftNode := newNode.Left
 	newNode.Left = LeftNode.Right
 
@@ -150,7 +197,8 @@ func (r *RBTree) rotateRight(newNode *Node) {
 }
 
 // Search will check if key is in tree and return if so
-func (r *RBTree) Search(key string) *Node {
+// If it does not exist it will return NilNode
+func (r *RBTree) Search(key string) (Node, error) {
 	r.Lock()
 	defer r.Unlock()
 	currentNode := r.Root
@@ -158,29 +206,43 @@ func (r *RBTree) Search(key string) *Node {
 		if key < currentNode.Key {
 			currentNode = currentNode.Left
 		}
-
 		if key > currentNode.Key {
 			currentNode = currentNode.Right
 		}
 	}
-	return currentNode
+
+	if currentNode == NilNode {
+		return nil, fmt.Errorf("key does not exist in tree: %s", key)
+	}
+	return currentNode, nil
 }
 
 // ToList returns a inorder list of tree
-func (r *RBTree) ToList() []Item {
+func (r *RBTree) ToList() []Node {
 	r.Lock()
 	defer r.Unlock()
 	// InOrder traversal to serialize nodes to list
-	r.inOrderTraverse(r.Root)
-	return r.list
+	return r.inOrderList()
 }
 
-func (r *RBTree) inOrderTraverse(node *Node) {
-	if node.Left != NilNode {
-		r.inOrderTraverse(node.Left)
+func (r *RBTree) inOrderList() []Node {
+
+	inorderList := []Node{}
+	current := r.Root
+	stack := []*RedBlackNode{current}
+
+	for n := len(stack); n > 0; n = len(stack) {
+		if current != NilNode {
+			stack = append(stack, current)
+			current = current.Left
+			continue
+		}
+
+		current = stack[n-1]
+		inorderList = append(inorderList, current)
+		stack = stack[:n-1]
+		current = current.Right
 	}
-	r.list = append(r.list, Item{node.Key, node.Value, false})
-	if node.Right != NilNode {
-		r.inOrderTraverse(node.Right)
-	}
+
+	return inorderList[:len(inorderList)-1]
 }
